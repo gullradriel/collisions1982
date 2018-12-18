@@ -1,0 +1,4 @@
+http://pousse.rapiere.free.fr/tome/ for the tile set
+allegro.cc for the avatar pack
+allegro developers for A5
+
