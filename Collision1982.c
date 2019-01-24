@@ -18,7 +18,7 @@ Gift asked:
 #define HEIGHT 800
 
 #include "nilorea/n_common.h"
-#include "nilorea/particle.h"
+#include "nilorea/n_particles.h"
 #include "nilorea/n_anim.h"
 #include <allegro5/allegro_native_dialog.h>
 #include <allegro5/allegro_ttf.h>
@@ -41,7 +41,6 @@ ALLEGRO_TIMER *logic_timer = NULL ;
 LIST *active_object = NULL ;                      /* list of active objects */
 
 LEVEL *level = NULL ;
-PARTICLE_SYSTEM *particle_system = NULL ;
 
 int main( int argc, char *argv[] )
 {
@@ -167,6 +166,7 @@ int main( int argc, char *argv[] )
                 break;
             }
         }
+        __attribute__ ((fallthrough));
         default:
             n_log( LOG_ERR, "\n    %s -h help -v version -V DEBUGLEVEL (NOLOG,VERBOSE,NOTICE,ERROR,DEBUG) -L logfile\n", argv[ 0 ] );
             exit( FALSE );
@@ -182,12 +182,12 @@ int main( int argc, char *argv[] )
     {
         n_abort("Unable to create display\n");
     }
-    al_set_window_title( display, "SantaToTheRescue [Extended]" );
+    al_set_window_title( display, "Collision1982" );
+
     al_set_new_bitmap_flags( ALLEGRO_VIDEO_BITMAP );
 
     ALLEGRO_FONT *font = al_load_font( "DATA/2Dumb.ttf", 18, 0 );
 
-    init_particle_system( &particle_system, 5000, 0, 0, 0, 100 );
 
     DONE = 0 ;
 
@@ -199,30 +199,34 @@ int main( int argc, char *argv[] )
 
     LEVEL *level = NULL ;
     level = load_level( "DATA/Levels/level1.txt", "DATA/Levels/level1_ressources.txt", WIDTH, HEIGHT );
-    int nb_to_rescue = level -> nb_to_rescue ;
-    int used_magic_blocks = 0, max_magic_blocks = 0 ;
 
     VECTOR3D_SET( player . physics . position, level -> startx, level -> starty, 0.0 );
     VECTOR3D_SET( player . physics . speed,  0.0, 0.0, 0.0  );
-    VECTOR3D_SET( player . physics . acceleration, 0.0, 300.0, 0.0 );
+    VECTOR3D_SET( player . physics . acceleration, 0.0, 0.0, 0.0 );
     VECTOR3D_SET( player . physics . orientation, 0.0, 0.0, 0.0 );
 
     player . physics . can_jump = 0, player . physics . sz = 3 ;
     player . attr . action = 0 ;
     player . attr . move = 0 ;
     player . attr . life = 100 ;
+    player . attr . xp = 0 ;
+    player . attr . level = 1 ;
+    player . attr . xp_to_level = 1000 ;
     player . attr . direction = 0 ;
-    player . attr . xspeedmax = 200 ;
-    player . attr . xspeedinc = 30 ;
+    player . attr . xspeedmax = 1000 ;
+    player . attr . xspeedinc = 10 ;
     player . attr . yspeedmax = 500 ;
-    player . attr . yspeedinc = player . attr . yspeedmax ;
+    player . attr . yspeedinc = 10 ;
+
+    double shoot_rate_time = 0 ;
+
     enum APP_KEYS
     {
         KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_ESC, KEY_SPACE, KEY_CTRL
     };
     int key[ 7 ] = {false,false,false,false,false,false,false};
     VECTOR3D old_pos ;
-    VECTOR3D friction = { 800.0, 800.0, 0.0 };
+    VECTOR3D friction = { 0.0, 15.0, 0.0 };
 
     al_register_event_source(event_queue, al_get_display_event_source(display));
 
@@ -240,13 +244,6 @@ int main( int argc, char *argv[] )
 
     int mx = 0, my = 0, mouse_b1 = 0, mouse_b2 = 0 ;
     int do_draw = 0, do_logic = 0 ;
-
-    /* ANIM_LIB *anim_lib = create_anim_library( "player" , 3 );
-       add_bmp_to_lib( anim_lib , 0 , "DATA/Gfxs/golem_gauche.bmp" , "DATA/Gfxs/golem_gauche.txt" );
-       add_bmp_to_lib( anim_lib , 1 , "DATA/Gfxs/golem_droite.bmp" , "DATA/Gfxs/golem_droite.txt" ); */
-    ALLEGRO_BITMAP *player_gfx[ 2 ];
-    player_gfx[ 0 ] = al_load_bitmap( "DATA/Gfxs/Santa_left.png" );
-    player_gfx[ 1 ] = al_load_bitmap( "DATA/Gfxs/Santa_right.png" );
 
     do
     {
@@ -344,306 +341,236 @@ int main( int argc, char *argv[] )
         }
 
 
+        /* Processing inputs */
+
+        /* dev mod: right click to temporary delete a block
+           left click to temporary add a block */
+        int mouse_button = -1 ;
+        if( mouse_b1==1 )
+            mouse_button = 1 ;
+        if( mouse_b2==1 )
+            mouse_button = 2 ;
+
+        player . attr . move = 0 ;
+
+        if( key[ KEY_UP ] )
+        {
+            VECTOR3D_SET( player . physics . speed, player . physics . speed[ 0 ], player . physics . speed[ 1 ] - player . attr . yspeedinc, player . physics . speed[ 2 ] );
+            if( player . physics . speed[ 1 ] < -player . attr . yspeedmax )
+                player . physics . speed[ 1 ] = -player . attr . yspeedmax ;
+
+            player . physics . can_jump = 0 ;
+            player . attr . move = 1 ;
+        }
+        else
+        {
+            if( player . physics . speed[ 1 ] < 0.0 )
+            {
+                player . physics . speed[ 1 ] = player . physics . speed[ 1 ] + friction[ 1 ] * delta_time / 1000000.0 ;
+                if( player . physics . speed[ 1 ] > 0.0 )
+                    player . physics . speed[ 1 ] = 0.0 ;
+            }
+        }
+
+
+        if( key[ KEY_DOWN ] )
+        {
+            VECTOR3D_SET( player . physics . speed, player . physics . speed[ 0 ], player . physics . speed[ 1 ] + player . attr . yspeedinc, player . physics . speed[ 2 ] );
+            if( player . physics . speed[ 1 ] > player . attr . yspeedmax )
+                player . physics . speed[ 1 ] = player . attr . yspeedmax ;
+            player . physics . can_jump = 0 ;
+            player . attr . move = 1 ;
+        }
+        else
+        {
+            if( player . physics . speed[ 1 ] > 0.0 )
+            {
+                player . physics . speed[ 1 ] = player . physics . speed[ 1 ] - friction[ 1 ] * delta_time / 1000000.0 ;
+                if( player . physics . speed[ 1 ] < 0.0 )
+                    player . physics . speed[ 1 ] = 0.0 ;
+            }
+        }
+
+        if( key[ KEY_LEFT ] )
+        {
+            VECTOR3D_SET( player . physics . speed, player . physics . speed[ 0 ] - player . attr . xspeedinc, player . physics . speed[ 1 ], player . physics . speed[ 2 ] );
+            if( player . physics . speed[ 0 ] < -player . attr . xspeedmax )
+                player . physics . speed[ 0 ] = -player . attr . xspeedmax ;
+            player . attr . direction = 1 ;
+            player . attr . move = 1 ;
+        }
+        else
+        {
+            if( player . physics . speed[ 0 ] < 0.0 )
+            {
+                player . physics . speed[ 0 ] = player . physics . speed[ 0 ] + friction[ 0 ] * delta_time / 1000000.0 ;
+                if( player . physics . speed[ 0 ] > 0.0 )
+                    player . physics . speed[ 0 ] = 0.0 ;
+            }
+        }
+
+
+        if( key[ KEY_RIGHT ] )
+        {
+            VECTOR3D_SET( player . physics . speed, player . physics . speed[ 0 ] + player . attr . xspeedinc, player . physics . speed[ 1 ], player . physics . speed[ 2 ] );
+            if( player . physics . speed[ 0 ] > player . attr . xspeedmax )
+                player . physics . speed[ 0 ] = player . attr . xspeedmax ;
+            player . attr . direction = 1 ;
+            player . attr . move = 1 ;
+        }
+        else
+        {
+            if( player . physics . speed[ 0 ] > 0.0 )
+            {
+                player . physics . speed[ 0 ] = player . physics . speed[ 0 ] - friction[ 0 ] * delta_time / 1000000.0 ;
+                if( player . physics . speed[ 0 ] < 0.0 )
+                    player . physics . speed[ 0 ] = 0.0 ;
+            }
+        }
+
+
+        if( key[KEY_CTRL ]  || mouse_button == 1 )
+        {
+            if( player . attr . action == 0 )
+                player . attr . action = 2 ;
+
+            if( player . attr . action == 3 )
+            {
+                if( shoot_rate_time > ( ( 11 - player . attr . level ) * 33333 ) )
+                {
+                    player . attr . action = 2 ;
+                    shoot_rate_time -= ( ( 11 - player . attr . level ) * 33333 )  ;
+                }
+            }
+        }
+        else
+        {
+            shoot_rate_time = 0 ;
+            player . attr . action = 0 ;
+        }
+
         if( do_logic == 1 )
         {
-            /* Processing inputs */
-
-            /* dev mod: right click to temporary delete a block
-               left click to temporary add a block */
-            int mouse_button = -1 ;
-            if( mouse_b1==1 )
-                mouse_button = 1 ;
-            if( mouse_b2==1 )
-                mouse_button = 2 ;
-            if( mouse_button != -1 )
-            {
-                int x = 0, y = 0, px = 0, py = 0 ;
-                PHYSICS position ;
-
-                memcpy( &position, &player . physics, sizeof( PHYSICS ) );
-
-                if( get_level_data( level, &position, mx - WIDTH/2, my - HEIGHT/2, &x, &y ) != -1 )
-                {
-                    if( get_level_data( level, &position, 0.0, 0.0, &px, &py ) != -1 )
-                    {
-                        if( x != px || y != py )
-                        {
-                            if( mouse_button == 1 && level -> cells[ x ][ y ] == 0 && used_magic_blocks < max_magic_blocks  )
-                            {
-                                level -> cells[ x ][ y ] = 3 ;
-                                used_magic_blocks ++ ;
-                            }
-                            if( mouse_button == 2 && level -> cells[ x ][ y ] == 3 )
-                            {
-                                level -> cells[ x ][ y ] = 0 ;
-                                used_magic_blocks -- ;
-                            }
-                        }
-                    }
-                }
-            }
-
-            player . attr . move = 0 ;
-
-
-            if( player . physics . can_jump == 1 && ( key[ KEY_UP ] || key[ KEY_SPACE ] )  )
-            {
-                VECTOR3D_SET( player . physics . speed, player . physics . speed[ 0 ], player . physics . speed[ 1 ] - player . attr . yspeedinc, player . physics . speed[ 2 ] );
-                if( player . physics . speed[ 1 ] < -player . attr . yspeedmax )
-                    player . physics . speed[ 1 ] = -player . attr . yspeedmax ;
-
-                player . physics . can_jump = 0 ;
-                player . attr . move = 1 ;
-            }
-
-            /* go down like you want */
-            if( key[ KEY_DOWN ] && player . physics . speed[ 1 ] < 0.0 )
-            {
-                VECTOR3D_SET( player . physics . speed, player . physics . speed[ 0 ], player . physics . speed[ 1 ] + player . attr . yspeedinc, player . physics . speed[ 2 ] );
-                if( player . physics . speed[ 1 ] < -player . attr . yspeedmax )
-                    player . physics . speed[ 1 ] = -player . attr . yspeedmax ;
-                player . attr . move = 1 ;
-            }
-            else
-            {
-                if( player . physics . speed[ 1 ] < 0.0 )
-                {
-                    player . physics . speed[ 1 ] = player . physics . speed[ 1 ] + friction[ 1 ] * delta_time / 1000000.0 ;
-                    if( player . physics . speed[ 1 ] > 0.0 )
-                        player . physics . speed[ 1 ] = 0.0 ;
-                }
-            }
-
-
-
-            if( key[ KEY_LEFT ] )
-            {
-                VECTOR3D_SET( player . physics . speed, player . physics . speed[ 0 ] - player . attr . xspeedinc, player . physics . speed[ 1 ], player . physics . speed[ 2 ] );
-                if( player . physics . speed[ 0 ] < -player . attr . xspeedmax )
-                    player . physics . speed[ 0 ] = -player . attr . xspeedmax ;
-                player . attr . direction = 0 ;
-                player . attr . move = 1 ;
-            }
-            else
-            {
-                if( player . physics . speed[ 0 ] < 0.0 )
-                {
-                    player . physics . speed[ 0 ] = player . physics . speed[ 0 ] + friction[ 0 ] * delta_time / 1000000.0 ;
-                    if( player . physics . speed[ 0 ] > 0.0 )
-                        player . physics . speed[ 0 ] = 0.0 ;
-                }
-            }
-
-            if( key[ KEY_RIGHT ] )
-            {
-                VECTOR3D_SET( player . physics . speed, player . physics . speed[ 0 ] + player . attr . xspeedinc, player . physics . speed[ 1 ], player . physics . speed[ 2 ] );
-                if( player . physics . speed[ 0 ] > player . attr . xspeedmax )
-                    player . physics . speed[ 0 ] = player . attr . xspeedmax ;
-                player . attr . direction = 1 ;
-                player . attr . move = 1 ;
-            }
-            else
-            {
-                if( player . physics . speed[ 0 ] > 0.0 )
-                {
-                    player . physics . speed[ 0 ] = player . physics . speed[ 0 ] - friction[ 0 ] * delta_time / 1000000.0 ;
-                    if( player . physics . speed[ 0 ] < 0.0 )
-                        player . physics . speed[ 0 ] = 0.0 ;
-                }
-            }
-
-
-            if( key[KEY_CTRL ] )
-            {
-                if( player . attr . action != 3 )
-                    player . attr . action = 2 ;
-            }
-            else
-            {
-                player . attr . action = 0 ;
-            }
-
+            shoot_rate_time += delta_time ;
             if( abs( player . physics . speed[ 0 ] ) < 0.5 )
                 player . physics . speed[ 0 ] = 0.0 ;
 
             memcpy( &old_pos, &player . physics . position, sizeof( VECTOR3D ) );
-
             animate_physics( level, &player . physics, friction, delta_time );
-            animate_monster( level, delta_time );
 
-
-            VECTOR3D particle_move ;
-            for( int it = 0 ; it < 3 ; it ++ )
-                particle_move[ it ] = old_pos[ it ] - player . physics . position[ it ] ;
-
-            move_particles( particle_system, particle_move[ 0 ], particle_move[ 1 ], particle_move[ 2 ] );
+            animate_level( level, &player, delta_time );
 
             /* add particles to player position , one blue , one red , one white/blue */
             if( ( player . attr . move != 0 || player . physics . can_jump == 0 ) || player . attr . action == 2 )
             {
+
                 PHYSICS tmp_part ;
-                int xpos = WIDTH / 2 ;
-                int ypos = HEIGHT/ 2 ;
-                int dir = -1 ;
-                if( player . attr . direction == 1 )
-                    dir = 1 ;
-                if( player . attr . move == 0 )
-                    dir = 1-rand()%3 ;
-                VECTOR3D_SET( tmp_part . speed, -dir * ( 100 + rand()%200 ), (-20 + rand()%40 ), 0.0  );
-                VECTOR3D_SET( tmp_part . position, xpos + 10 - rand()%20, ypos + 10 - rand()%20, 0.0  );
-                VECTOR3D_SET( tmp_part . acceleration, 0.0, 0.0, 0.0 );
-                VECTOR3D_SET( tmp_part . orientation, 0.0, 0.0, 0.0 );
-                add_particle( particle_system, -1, NORMAL_PART, 100 + rand()%500, al_map_rgba(   55 + rand()%200,  55 + rand()%200, 55 + rand()%200, 100 + rand()%155 ), tmp_part );
+                tmp_part . sz = 10 ;
+                for( int it = 0 ; it < player . physics . speed[ 0 ] /100 ; it ++ )
+                {
+                    VECTOR3D_SET( tmp_part . speed,
+                                  -player . physics . speed[ 0 ] + 100 - rand()%200,
+                                  -player . physics . speed[ 1 ] + 100 - rand()%200,
+                                  0.0  );
+                    VECTOR3D_SET( tmp_part . position, player . physics . position[ 0 ], player . physics . position[ 1 ], 0.0  );
+                    VECTOR3D_SET( tmp_part . acceleration, 0.0, 0.0, 0.0 );
+                    VECTOR3D_SET( tmp_part . orientation, 0.0, 0.0, 0.0 );
+                    add_particle( level -> particle_system_effects, -1, PIXEL_PART, 100 + rand()%500, 1+rand()%3,
+                                  al_map_rgba(   55 + rand()%200,  55 + rand()%200, 55 + rand()%200, 10 + rand()%245 ), tmp_part );
+
+                }
 
                 if( player . attr . action == 2 )
                 {
                     player . attr . action = 3 ;
-                    dir = -1 ;
-                    if( player . attr . direction == 1 )
-                        dir = 1 ;
 
-                    for( int it = 0 ; it < 100 ; it ++ )
-                    {
+                    double itx = 0, ity = 0, itz = 0, sz = 0;
 
-                        VECTOR3D_SET( tmp_part . speed, dir * ( 500 + rand()%500 ), (-50 + rand()%100 ), 0.0  );
-                        VECTOR3D_SET( tmp_part . position, xpos + dir * rand()%20, ypos - rand()%64, 0.0  );
-                        VECTOR3D_SET( tmp_part . acceleration, -dir * ( 500 + rand()%500 ), 0.0, 0.0 );
-                        VECTOR3D_SET( tmp_part . orientation, 0.0, 0.0, 0.0 );
+                    itx = (double)(mx - level -> native_w / 2  ) - level -> tilew / 2 ;
+                    ity = (double)(my - level -> native_h / 2  ) - level -> tileh / 2 ;
+                    itz = 0 ;
+                    sz = sqrt((itx * itx) + (ity * ity) + (itz * itz));
+                    itx /= sz ;
+                    ity /= sz ;
+                    itz /= sz ;
 
-                        add_particle( particle_system, -1, NORMAL_PART, 100 + rand()%500, al_map_rgba(  55 + rand()%200, 55 + rand()%200, 10, 100 + rand()%155 ), tmp_part );
-
-                    }
-                    list_foreach( node, level -> monster_list )
+                    for( int it = 0  ; it < player. attr . level ; it ++ )
                     {
-                        MONSTER *npc = (MONSTER *)node -> ptr ;
-                        int px = player . physics . position[ 0 ] ;
-                        int py = player . physics . position[ 1 ] ;
-                        int npx = npc -> physics . position[0];
-                        int npy = npc -> physics . position[1];
-                        if( dir > 0 )
-                        {
-                            if( npx >= px && npx <= ( ( px + 200 ) ) && npy >= ( py - 64 ) && npy <= ( py + 5 ) )
-                            {
-                                int pmult = 1 ;
-                                npc -> attr . life -= 33 ;
-                                if( npc -> attr . life <= 0 )
-                                    pmult = 3 ;
-                                npc -> physics . speed[ 0 ] = 50 + abs( npc -> physics . speed[ 0 ] ) ;
-                                npc -> physics . speed[ 1 ] = -250 ;
-                                npx =  WIDTH /2 - player . physics . position[ 0 ] + npc -> physics . position[0] ;
-                                npy =  HEIGHT/2 - player . physics . position[ 1 ] + npc -> physics . position[1] ;
-                                for( int it = 0 ; it < 10*pmult ; it ++ )
-                                {
-                                    VECTOR3D_SET( tmp_part . speed, 50 + rand()%100, -50 - rand()%100, 0.0  );
-                                    VECTOR3D_SET( tmp_part . position, npx, npy, 0.0  );
-                                    VECTOR3D_SET( tmp_part . acceleration, 0.0, 0.0, 0.0 );
-                                    VECTOR3D_SET( tmp_part . orientation, 0.0, 0.0, 0.0 );
-                                    add_particle( particle_system, -1, NORMAL_PART, 500 + rand()%500, al_map_rgba(  55 + rand()%200, 0, 0, 100 + rand()%155 ), tmp_part );
-                                }
-                            }
-                        }
-                        if( dir < 0 )
-                        {
-                            if( npx >= ( px - 200 ) && npx <= px && npy >= ( py - 64 ) && npy <= ( py + 5 ) )
-                            {
-                                int pmult = 1 ;
-                                npc -> attr . life -= 33 ;
-                                if( npc -> attr . life <= 0 )
-                                    pmult = 3 ;
-                                npc -> physics . speed[ 0 ] = -50 -abs( npc -> physics . speed[ 0 ] ) ;
-                                npc -> physics . speed[ 1 ] = -250 ;
-                                npx =  WIDTH /2 - player . physics . position[ 0 ] + npc -> physics . position[0] ;
-                                npy =  HEIGHT/2 - player . physics . position[ 1 ] + npc -> physics . position[1] ;
-                                for( int it = 0 ; it < 10*pmult; it ++ )
-                                {
-                                    VECTOR3D_SET( tmp_part . speed, -50 - rand()%100, -50 - rand()%100, 0.0  );
-                                    VECTOR3D_SET( tmp_part . position, npx, npy, 0.0  );
-                                    VECTOR3D_SET( tmp_part . acceleration, 0.0, 0.0, 0.0 );
-                                    VECTOR3D_SET( tmp_part . orientation, 0.0, 0.0, 0.0 );
-                                    add_particle( particle_system, -1, NORMAL_PART, 500 + rand()%500, al_map_rgba(  55 + rand()%200, 0, 0, 100 + rand()%155 ), tmp_part );
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            list_foreach( node, level -> monster_list )
-            {
-                MONSTER *npc = (MONSTER *)node -> ptr ;
-                int px = player . physics . position[ 0 ] ;
-                int py = player . physics . position[ 1 ] ;
-                int npx = npc -> physics . position[0];
-                int npy = npc -> physics . position[1];
-                if( npx >= px - 24 && npx <= px + 24 && npy >= py - 62 && npy <= py )
-                {
-                    player . attr . life -= 3 ;
-                    if( player . attr . life < 0 )
-                    {
-                        player . attr . life  = 0 ;
-                        DONE = 2 ;
-                    }
-                    if( npx < px )
-                    {
-                        npc -> physics . speed[0] = -abs(	npc -> physics . speed[0] ) - 10 ;
-                        npc -> physics . speed[1] = -100 ;
-                    }
-                    else
-                    {
-                        npc -> physics . speed[0] = abs(	npc -> physics . speed[0] ) + 10 ;
-                        npc -> physics . speed[1] = -100 ;
-                    }
-                    npx =  WIDTH /2 - player . physics . position[ 0 ] + npc -> physics . position[0] ;
-                    npy =  HEIGHT/2 - player . physics . position[ 1 ] + npc -> physics . position[1] ;
-                    for( int it = 0 ; it < 20; it ++ )
-                    {
-                        PHYSICS tmp_part ;
-                        VECTOR3D_SET( tmp_part . speed, -50 - rand()%100, -50 - rand()%100, 0.0  );
-                        VECTOR3D_SET( tmp_part . position, npx, npy, 0.0  );
+                        double speed_mult = 500 +rand()%100 ;
+                        double accuity = rand()%( 10* (11 - player . attr . level) );
+                        VECTOR3D_SET( tmp_part . speed, accuity + player . physics . speed[ 0 ] + itx * speed_mult, accuity + player . physics . speed[ 1 ] + ity * speed_mult, player . physics . speed[ 2 ] + itz * speed_mult );
+                        VECTOR3D_SET( tmp_part . position, player . physics . position[ 0 ], player . physics . position[ 1 ],  0.0  );
                         VECTOR3D_SET( tmp_part . acceleration, 0.0, 0.0, 0.0 );
                         VECTOR3D_SET( tmp_part . orientation, 0.0, 0.0, 0.0 );
-                        add_particle( particle_system, -1, NORMAL_PART, 500 + rand()%500, al_map_rgba(  55 + rand()%200, 0, 0, 100 + rand()%155 ), tmp_part );
+                        int bw_color =  10 + rand()%200 ;
+                        add_particle( level -> particle_system_bullets, -1, PIXEL_PART, 2000 , 5 + rand()%player.attr.level,  al_map_rgba(  bw_color, bw_color, bw_color, 255 - bw_color  ), tmp_part );
+
                     }
 
                 }
+
+                list_foreach( node, level -> monster_list )
+                {
+                    MONSTER *npc = (MONSTER *)node -> ptr ;
+                    int px = player . physics . position[ 0 ] ;
+                    int py = player . physics . position[ 1 ] ;
+                    int npx = npc -> physics . position[0];
+                    int npy = npc -> physics . position[1];
+
+                    if( npx >= px - 32 && npx <= px + 32 && npy >= py - 32 && npy <= py + 32 )
+                    {
+                        player . attr . life -= 3 ;
+                        npc -> attr . life = 0 ;
+
+                        if( player . attr . life < 0 )
+                        {
+                            player . attr . life  = 0 ;
+                            DONE = 2 ;
+                        }
+                        npx =  player . physics . position[ 0 ] ;
+                        npy =  player . physics . position[ 1 ] ;
+                        for( int it = 0 ; it < 20; it ++ )
+                        {
+                            PHYSICS tmp_part ;
+                            tmp_part . sz = 5  ;
+                            VECTOR3D_SET( tmp_part . speed, 100 - rand()%200, 100 - rand()%200, 0.0  );
+                            VECTOR3D_SET( tmp_part . position, px, py, 0.0  );
+                            VECTOR3D_SET( tmp_part . acceleration, 0.0, 0.0, 0.0 );
+                            VECTOR3D_SET( tmp_part . orientation, 0.0, 0.0, 0.0 );
+                            add_particle( level -> particle_system_effects, -1, PIXEL_PART, 500 + rand()%500, 1+rand()%5, al_map_rgba( 0 , 55 + rand()%200, 0, 100 + rand()%155 ), tmp_part );
+                        }
+                    }
+                }
             }
-
-
-
-            manage_particle( particle_system );
 
             int cellx = player . physics . position[ 0 ] / level -> tilew ;
             int celly = player . physics . position[ 1 ] / level -> tileh ;
-            /* cell containing a rescue item */
-            if( level -> cells[ cellx ][ celly ] >= 100 )
+            if( cellx >= 0 && cellx < level -> w && celly >= 0 && celly < level -> h )
             {
-                level -> cells[ cellx ][ celly ] = 0 ;
-                nb_to_rescue -- ;
+                /* cell containing a bonus item */
+                if( level -> cells[ cellx ][ celly ] == 11 )
+                {
+                    level -> cells[ cellx ][ celly ] = 0 ;
+                }
+                /* cell containing an exit */
+                if( level -> cells[ cellx ][ celly ] == -2 )
+                    DONE = 1 ;
             }
-            /* cell containing a wall item */
-            if( level -> cells[ cellx ][ celly ] == 11 )
-            {
-                level -> cells[ cellx ][ celly ] = 0 ;
-                max_magic_blocks ++ ;
-            }
-            /* cell containing an exit */
-            if( level -> cells[ cellx ][ celly ] == -2 && nb_to_rescue == 0 )
-                DONE = 1 ;
             do_logic = 0 ;
         }
 
         if( do_draw == 1 )
         {
+            static int green_it = 100 ;
             al_set_target_bitmap( scrbuf );
             al_clear_to_color( al_map_rgba( 0, 0, 0, 255 ) );
 
             draw_level( level, player . physics . position[ 0 ], player . physics . position[ 1 ], WIDTH, HEIGHT );
 
-            int pw = al_get_bitmap_width(  player_gfx[ player .attr . direction ] );
-            int ph = al_get_bitmap_height(  player_gfx[ player . attr . direction ] );
-
-            al_draw_bitmap( player_gfx[ player . attr . direction ], WIDTH / 2 - pw/2, HEIGHT/2 - ph, 0);
-
-            draw_particle( particle_system );
+            green_it +=15;
+            if( green_it > 255 )
+                green_it = 100 ;
+            al_draw_filled_circle( WIDTH / 2, HEIGHT/2, 20 + green_it / 20,  al_map_rgb( 255 - (255 *player . attr . life), green_it - (green_it *(100- player . attr . life) ), 0 ) );
 
             al_acknowledge_resize( display );
             int w = al_get_display_width(  display );
@@ -658,11 +585,14 @@ int main( int argc, char *argv[] )
             al_draw_line( mx - 5, my, mx + 5, my, al_map_rgb( 255, 0, 0 ), 1 );
             al_draw_line( mx, my + 5, mx, my - 5, al_map_rgb( 255, 0, 0 ), 1 );
 
-            al_draw_filled_rectangle( 20, HEIGHT - 20, 20 + player . attr . life * 10, HEIGHT - 40, al_map_rgb( 255, 0, 0 ) );
+            /* speed meter */
+            al_draw_filled_rectangle( 20 , h/2 , 25 , h/2 + player . physics . speed[ 1 ] , al_map_rgba( 255 , 255 , 255 , 255 ) );
+            al_draw_filled_rectangle( w/2 , h -20 , w/2 + player . physics . speed[ 0 ] , h-25, al_map_rgba( 255 , 255 , 255 , 255 ) );
+
 
             N_STR *nstr = NULL ;
-            nstrprintf( nstr, "Life: %d Number of blocks available: %d Still to rescue: %d", player . attr . life, max_magic_blocks, nb_to_rescue );
-            al_draw_text( font, al_map_rgb( 255, 0, 0 ), 10, 10, 0, _nstr( nstr ) );
+            nstrprintf( nstr, "Life: %d %%", player . attr . life );
+            al_draw_text( font, al_map_rgb( 255, 0, 0 ), 20, HEIGHT - 20, 0, _nstr( nstr ) );
             free_nstr( &nstr );
 
             al_flip_display();
@@ -673,18 +603,18 @@ int main( int argc, char *argv[] )
     while( !key[KEY_ESC] && !DONE );
 
     N_STR *str = new_nstr( 100 );
-    nstrcat_bytes( str, "--Santa To The Rescue--\n\nEND OF GAME\n\n" );
+    nstrcat_bytes( str, "Collision1982 " );
     if( DONE == 1 )
     {
-        nstrcat_bytes( str, "YOU SAVED EVERYONE ! WELL PLAYED !\n" );
+        nstrcat_bytes( str, "YOU WIN !" );
     }
     else
-        nstrcat_bytes( str, "YOU LOST !\n" );
+        nstrcat_bytes( str, "YOU LOST !" );
 
 
 
     al_show_native_message_box(  al_get_current_display(),
-                                 "SantaToTheRescue",
+                                 "Collision1982",
                                  "Game Over", _nstr( str ), NULL, 0  );
 
 
@@ -696,7 +626,7 @@ int main( int argc, char *argv[] )
 
     list_destroy( &active_object );
 
-    return TRUE;
+    return 0;
 
 }
 

@@ -39,7 +39,7 @@ ifeq ($(OS),Windows_NT)
 	    -fno-omit-frame-pointer \
 	    -ffloat-store
 
-	CLIBS+= -Wl,-Bstatic -lpthread -Wl,-Bdynamic -lws2_32  -L../lIB/. -mwindows
+	CLIBS+= -Wl,-Bstatic -lpthread -Wl,-Bdynamic -lws2_32  -L../lIB/. #-mwindows
     RM= del /Q
     CC= gcc
 	ifeq (${MSYSTEM},MINGW32)
@@ -94,7 +94,7 @@ else
     endif
 endif
 
-SRC=n_common.c n_log.c n_str.c n_list.c n_3d.c n_time.c n_anim.c particle.c level.c Collision1982.c
+SRC=n_common.c n_log.c n_str.c n_list.c n_3d.c n_time.c n_anim.c n_particles.c level.c Collision1982.c
 OBJ=$(SRC:%.c=%.o)
 .c.o:
 	$(COMPILE.c) $<

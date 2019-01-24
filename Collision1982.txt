@@ -1,0 +1,19 @@
+KrampusHack 2018
+
+Collision1982
+
+Controls: 
+
+-arrows for horizontal and vertical thrust, be warned that a collision mess your trust values
+-mouse aim and left button: aim and shoot
+
+Objective:
+
+-Reach the far right side of the screen and take one exit door while avoiding or killing the enemies that will try to kill you.
+
+Hint:
+
+-Do not thrust too much. Cruise low and aim fine, take your time.
+-The more enemies you kill, the more powerful you got
+
+Should compile fine under windows and linux with the right dependencies. If asked I'll build a linux version.

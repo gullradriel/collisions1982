@@ -24,7 +24,7 @@ extern "C" {
 #include "nilorea/n_str.h"
 #include "nilorea/n_hash.h"
 #include "nilorea/n_anim.h"
-#include "nilorea/particle.h"
+#include "nilorea/n_particles.h"
 
 
 #define ACTION_MOVE 2
@@ -34,12 +34,16 @@ extern "C" {
 #define AGRESSIVE_MONSTER 1
 #define BIGBOSS_MONSTER 2
 
+
 typedef struct ATTRIBUTES
 {
     int	life,
         type,
         action,
         move,
+        xp,
+        xp_to_level,
+        level,
         direction,
         xspeedmax,
         yspeedmax,
@@ -64,7 +68,7 @@ typedef struct PLAYER
 {
     PHYSICS physics ;
     ANIM_DATA anim ;
-    ATTRIBUTES attr ;
+        ATTRIBUTES attr ;
 } PLAYER;
 
 MONSTER *new_monster( int life, int type, PHYSICS physics );
@@ -86,18 +90,19 @@ typedef struct LEVEL
 
     LIST *monster_list ;
 
-    ALLEGRO_BITMAP **rescue_icons,
-                   *monsters[ 3 ],
-                   *tiles[ 5 ];
-    int nb_to_rescue ;
+    ALLEGRO_BITMAP *tiles[ 4 ];
+
+    PARTICLE_SYSTEM *particle_system_effects ;
+    PARTICLE_SYSTEM *particle_system_bullets ;
 
 } LEVEL ;
 
 int get_level_data( LEVEL *level, PHYSICS *physics, int mx, int my, int *x, int *y );
 LEVEL *load_level( char *file, char *resfile, int w, int h );
 int draw_level( LEVEL *lvl, int x, int y, int w, int h);
+int test_coord( LEVEL *level, PHYSICS *physics, VECTOR3D fricton, int off_x, int off_y );
 int animate_physics( LEVEL *level, PHYSICS *physics, VECTOR3D friction, double delta_t );
-int animate_monster( LEVEL *level, double delta_t );
+int animate_level( LEVEL *level, PLAYER *player, double delta_t );
 
 
 
