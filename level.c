@@ -211,7 +211,7 @@ int animate_physics( LEVEL *level, PHYSICS *physics, VECTOR3D friction, double d
     return TRUE ;
 }
 
-int animate_level( LEVEL *level,  PLAYER *player , double delta_t )
+int animate_level( LEVEL *level,  PLAYER *player, double delta_t )
 {
     VECTOR3D friction = { 0.0, 500.0, 0.0 };
     LIST_NODE *node = NULL ;
@@ -295,7 +295,7 @@ int animate_level( LEVEL *level,  PLAYER *player , double delta_t )
                             VECTOR3D_SET( tmp_part . acceleration, 0.0, 0.0, 0.0 );
                             VECTOR3D_SET( tmp_part . orientation, 0.0, 0.0, 0.0 );
                             add_particle( level -> particle_system_effects, -1, PIXEL_PART, 100 + rand()%500, 1+rand()%3,
-                                         al_map_rgba(   55 + rand()%200,  0, 0, 100 + rand()%155 ), tmp_part );
+                                          al_map_rgba(   55 + rand()%200,  0, 0, 100 + rand()%155 ), tmp_part );
 
                         }
                     }
@@ -551,12 +551,12 @@ int draw_level( LEVEL *lvl, int px, int py, int w, int h )
                     }
                     else
                     {*/
-                        if( lvl -> cells[ px ][ py ] == 1 )
-                            al_draw_rectangle( x1, y1, x2, y2, al_map_rgb( 255, 255, 255 ), 2 );
-                        if( lvl -> cells[ px ][ py ] == 2 )
-                            al_draw_rectangle( x1, y1, x2, y2, al_map_rgb( 155, 155, 155 ), 2 );
-                        if( lvl -> cells[ px ][ py ] == 3 )
-                            al_draw_rectangle( x1, y1, x2, y2, al_map_rgb( 155, 55, 55 ), 2 );
+                    if( lvl -> cells[ px ][ py ] == 1 )
+                        al_draw_rectangle( x1, y1, x2, y2, al_map_rgb( 255, 255, 255 ), 2 );
+                    if( lvl -> cells[ px ][ py ] == 2 )
+                        al_draw_rectangle( x1, y1, x2, y2, al_map_rgb( 155, 155, 155 ), 2 );
+                    if( lvl -> cells[ px ][ py ] == 3 )
+                        al_draw_rectangle( x1, y1, x2, y2, al_map_rgb( 155, 55, 55 ), 2 );
                     /*}*/
                 }
                 else if( lvl -> cells[ px ][ py ] == -2 )

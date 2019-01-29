@@ -68,7 +68,7 @@ typedef struct PLAYER
 {
     PHYSICS physics ;
     ANIM_DATA anim ;
-        ATTRIBUTES attr ;
+    ATTRIBUTES attr ;
 } PLAYER;
 
 MONSTER *new_monster( int life, int type, PHYSICS physics );

@@ -503,7 +503,7 @@ int main( int argc, char *argv[] )
                         VECTOR3D_SET( tmp_part . acceleration, 0.0, 0.0, 0.0 );
                         VECTOR3D_SET( tmp_part . orientation, 0.0, 0.0, 0.0 );
                         int bw_color =  10 + rand()%200 ;
-                        add_particle( level -> particle_system_bullets, -1, PIXEL_PART, 2000 , 5 + rand()%player.attr.level,  al_map_rgba(  bw_color, bw_color, bw_color, 255 - bw_color  ), tmp_part );
+                        add_particle( level -> particle_system_bullets, -1, PIXEL_PART, 2000, 5 + rand()%player.attr.level,  al_map_rgba(  bw_color, bw_color, bw_color, 255 - bw_color  ), tmp_part );
 
                     }
 
@@ -537,7 +537,7 @@ int main( int argc, char *argv[] )
                             VECTOR3D_SET( tmp_part . position, px, py, 0.0  );
                             VECTOR3D_SET( tmp_part . acceleration, 0.0, 0.0, 0.0 );
                             VECTOR3D_SET( tmp_part . orientation, 0.0, 0.0, 0.0 );
-                            add_particle( level -> particle_system_effects, -1, PIXEL_PART, 500 + rand()%500, 1+rand()%5, al_map_rgba( 0 , 55 + rand()%200, 0, 100 + rand()%155 ), tmp_part );
+                            add_particle( level -> particle_system_effects, -1, PIXEL_PART, 500 + rand()%500, 1+rand()%5, al_map_rgba( 0, 55 + rand()%200, 0, 100 + rand()%155 ), tmp_part );
                         }
                     }
                 }
@@ -586,8 +586,8 @@ int main( int argc, char *argv[] )
             al_draw_line( mx, my + 5, mx, my - 5, al_map_rgb( 255, 0, 0 ), 1 );
 
             /* speed meter */
-            al_draw_filled_rectangle( 20 , h/2 , 25 , h/2 + player . physics . speed[ 1 ] , al_map_rgba( 255 , 255 , 255 , 255 ) );
-            al_draw_filled_rectangle( w/2 , h -20 , w/2 + player . physics . speed[ 0 ] , h-25, al_map_rgba( 255 , 255 , 255 , 255 ) );
+            al_draw_filled_rectangle( 20, h/2, 25, h/2 + player . physics . speed[ 1 ], al_map_rgba( 255, 255, 255, 255 ) );
+            al_draw_filled_rectangle( w/2, h -20, w/2 + player . physics . speed[ 0 ], h-25, al_map_rgba( 255, 255, 255, 255 ) );
 
 
             N_STR *nstr = NULL ;
